@@ -1,0 +1,109 @@
+---
+title: "psychological network visualization using qgraph practice"
+output: html_document
+---
+
+reference1 : https://cran.r-project.org/web/packages/qgraph/qgraph.pdf
+
+reference2 : Jones, P. J., Mair, P., & McNally, R. J. (2018). Visualizing psychological networks: A tutorial in R. Frontiers in Psychology, 9, 1742.
+
+reference3 : Epskamp, S., Cramer, A. O., Waldorp, L. J., Schmittmann, V. D., & Borsboom, D. The qgraph package for network visualizations of psychometric data.
+
+### Psychological Network Analysis, qgraph
+In the field of psychometric, the relations between latent variable and manifest variable are researched, and a method to visualize the result is useful. Visualizing latent, manifest variable into a network structure is especially useful. One example may be the big five personality trait and how the traits correlate, another example may be networks of psychopathological symptoms and how it interacts. Both in the US and Europe(especially in the Netherlands), quantitative psychology is actively researched. Rigorous theoretical study regarding latent/manifest network structure will be valuable for future studies within quantitative psychology as well as applications to other fields, where research regarding multiple variables and their dynamic interaction is performed.
+
+This page serves as personal practice of visiualizing psychological network using `qgraph`. The package heavily used is `qgraph`, and the methods are heavily borrowed from the package page and the tutorial paper by Jones, Mair, McNally. Additional reference was added which is from the maintainer and the department of psychological method from Univerisity of Amsterdam.
+
+### Setup
+```{r, echo = FALSE, include = FALSE}
+# Load Library
+library(qgraph)
+library(tidyverse)
+library(MPsychoR)
+library(smacof)
+library(wordcloud)
+```
+
+```{r}
+# Load data
+library(MPsychoR)
+data(Rogers) ; data(Rogers_Adolescent)
+library(tidyverse)
+Rogers <- as_tibble(Rogers) ; Rogers_Adolescent <- as_tibble(Rogers_Adolescent)
+Rogers
+Rogers_Adolescent
+```
+`Rogers`, `Rogers_Adolescent` are datasets in `MPsychoR` package containing data of OCD symptoms in adults. 
+
+```{r}
+# Data Handling
+colnames(Rogers) <- colnames(Rogers_Adolescent) <- 1:26
+```
+
+### Visualization & Misinterpretation
+```{r}
+# Plot Rogers
+library(qgraph)
+adult_zeroorder = cor(Rogers)
+qgraph(adult_zeroorder)
+qgraph(adult_zeroorder, 
+       layout = "spring",
+       groups = list("Depression" = 1:16, "OCD" = 17:26),
+       color = c("lightblue", "lightsalmon"))
+```
+
+`qgraph` takes correlation matrix of the data as input(as well as different objects), and results a graph showing correlation between variables. `layout = "spring"` option uses Fruchterman-Reingold (FR) algorithm to plot graphs in a way that minimizes overlap between edges, making the graphs visually appealing. However, it is warned in tutorial paper that the spatial positioning should not be interpretted as to have special meaning.
+
+
+### Multidimensional Scaling of Networks
+MDS represents proximities among variables as distances between points in a low-dimensional space. Hence, it suits us with our goal of visualizing multi variable relation in 2d space. Proximities may be such as correlations, partial correlations or Euclidean distances. 
+
+```{r}
+# Performing MDS
+library(smacof)
+dissimilarity_adult <- sim2diss(adult_zeroorder)
+adult_MDS <- mds(dissimilarity_adult)
+adult_MDS_mspline <- mds(dissimilarity_adult,
+                         type = "mspline")
+```
+Perform the required transformations, transformation options include `ordinal`, `ratio`, `interval`. Methods to choose the best transformation is given in paper.
+
+```{r}
+# Visualize
+qgraph(adult_zeroorder,
+       layout = adult_MDS_mspline$conf,
+       groups = list("Depression" = 1:16, "OCD" = 17:26),
+       color = c("lightblue", "lightsalmon"))
+```
+
+Can visualize network based on zero-correlation coefficients. (of course visualizing with partial correlation is also possible)
+
+```{r}
+# Visualize with small nodes
+library(wordcloud)
+qgraph(adult_zeroorder,
+       layout = adult_MDS_mspline$conf,
+       groups = list("Depression" = 1:16, "OCD" = 17:26),
+       color = c("lightblue", "lightsalmon"),
+       vsize = 0, rescale = FALSE, labels = FALSE)
+points(adult_MDS_mspline$conf, pch = 16)
+textplot(adult_MDS_mspline$conf[,1] + .03,
+         adult_MDS_mspline$conf[,2] + .03,
+         colnames(adult_zeroorder),
+         new = F)
+```
+
+Can visualize with turning edges off.
+
+```{r}
+# Visualize with EBICglasso
+adult_glasso <- EBICglasso(cor(Rogers), n = 408)
+qgraph(adult_glasso,
+       layout = adult_MDS_mspline$conf,
+       groups = list("Depression" = 1:16, "OCD" = 17:26),
+       color = c("lightblue", "lightsalmon"))
+```
+
+Can visualize *partial correlation* on *zero-correlation space*, hence the layout is given by the zero-correlation between variables, whereas the edge thickness shows regularized partial correlation.
+
+to be continued..
